@@ -1,0 +1,30 @@
+name: MakeO Reviews Bot
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # runs every hour
+  workflow_dispatch:  # allows manual trigger too
+
+jobs:
+  check-reviews:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run bot
+        env:
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          GROUP_ID: ${{ secrets.GROUP_ID }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: node index.js
