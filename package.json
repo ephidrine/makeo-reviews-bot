@@ -1,0 +1,14 @@
+{
+  "name": "makeo-reviews-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "google-play-scraper": "^9.1.0",
+    "app-store-scraper": "^0.22.0",
+    "node-fetch": "^2.7.0",
+    "node-cron": "^3.0.3"
+  }
+}
