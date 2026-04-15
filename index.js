@@ -1,3 +1,8 @@
+import fetch from 'node-fetch';
+import gplay from 'google-play-scraper';
+import store from 'app-store-scraper';
+import { google } from 'googleapis';
+
 const gplay = require('google-play-scraper');
 const store = require('app-store-scraper');
 const fetch = require('node-fetch');
