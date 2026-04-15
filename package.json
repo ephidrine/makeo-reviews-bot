@@ -8,7 +8,7 @@
   "dependencies": {
     "google-play-scraper": "^9.1.0",
     "app-store-scraper": "0.18.0",
-    "node-fetch": "^3.3.0",
+   "node-fetch": "^2.7.0",
     "googleapis": "^140.0.0"
   }
 }
