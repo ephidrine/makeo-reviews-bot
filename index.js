@@ -59,9 +59,20 @@ async function saveId(sheets, id) {
 
 async function sendWhatsApp(message) {
   const url = `https://api.green-api.com/waInstance${INSTANCE_ID}/sendMessage/${API_TOKEN}`;
-  await httpsPost(url, { chatId: GROUP_ID, message });
+  const body = JSON.stringify({ chatId: GROUP_ID, message });
+  const u = new URL(url);
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: u.hostname,
+      path: u.pathname,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, res => { res.on('data', () => {}); res.on('end', resolve); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
 }
-
 function stars(n) {
   return '⭐'.repeat(n) + '☆'.repeat(5 - n);
 }
