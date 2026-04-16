@@ -8,6 +8,6 @@
   "dependencies": {
     "google-play-scraper": "^9.1.0",
     "app-store-scraper": "0.18.0",
-    "googleapis": "^140.0.0"
+    "googleapis": "^118.0.0"
   }
 }
