@@ -87,7 +87,7 @@ async function checkPlayStore(sheets, seen) {
     if (seen[r.id]) continue;
     seen[r.id] = true;
     await saveId(sheets, r.id);
-    const msg = `🤖 *New Play Store Review*\n${stars(r.score)}\n👤 ${r.userName}\n📅 ${new Date(r.date).toDateString()}\n\n"${r.text}"`;
+    const msg = `🟢*New Play Store Review*\n${stars(r.score)}\n ${r.userName}\n📅 ${new Date(r.date).toDateString()}\n\n"${r.text}"`;
     await sendWhatsApp(msg);
     console.log('Sent Play Store review:', r.id);
   }
