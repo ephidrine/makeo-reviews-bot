@@ -2,7 +2,7 @@ name: MakeO Reviews Bot
 
 on:
   schedule:
-    - cron: '0 * * * *'  # runs every hour
+    - cron: '0 */3 * * *'  # runs every 3 hours
   workflow_dispatch:  # allows manual trigger too
 
 jobs:
