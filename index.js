@@ -95,7 +95,7 @@ async function checkPlayStore(sheets, seen) {
 
 async function checkAppStore(sheets, seen) {
   const reviews = await store.reviews({
-    appId: '1573537173',
+    id: 1573537173,
     country: 'in',
     sort: store.sort.RECENT,
     page: 1
