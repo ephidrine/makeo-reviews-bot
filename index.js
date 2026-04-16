@@ -1,6 +1,6 @@
 const gplay = require('google-play-scraper');
 const store = require('app-store-scraper');
-const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
+const https = require('https');
 const { google } = require('googleapis');
 
 const INSTANCE_ID = process.env.INSTANCE_ID;
@@ -8,6 +8,26 @@ const API_TOKEN = process.env.API_TOKEN;
 const GROUP_ID = process.env.GROUP_ID;
 const SHEET_ID = '1mkGjmA51eZnVyY5WgkfNZMBmpFG5qriEQgzqaUs8_zI';
 const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+
+function httpsPost(url, data) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(data);
+    const u = new URL(url);
+    const req = https.request({
+      hostname: u.hostname,
+      path: u.pathname,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => resolve(d));
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
 
 async function getSheet() {
   const auth = new google.auth.GoogleAuth({
@@ -39,11 +59,7 @@ async function saveId(sheets, id) {
 
 async function sendWhatsApp(message) {
   const url = `https://api.green-api.com/waInstance${INSTANCE_ID}/sendMessage/${API_TOKEN}`;
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chatId: GROUP_ID, message })
-  });
+  await httpsPost(url, { chatId: GROUP_ID, message });
 }
 
 function stars(n) {
