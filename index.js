@@ -8,6 +8,7 @@ const API_TOKEN = process.env.API_TOKEN;
 const GROUP_ID = process.env.GROUP_ID;
 const SHEET_ID = '1mkGjmA51eZnVyY5WgkfNZMBmpFG5qriEQgzqaUs8_zI';
 const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const IS_SUMMARY = process.env.GITHUB_EVENT_SCHEDULE === '30 4 * * *';
 
 function httpsPost(url, data) {
   return new Promise((resolve, reject) => {
@@ -18,11 +19,7 @@ function httpsPost(url, data) {
       path: u.pathname,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => resolve(d));
-    });
+    }, res => { res.on('data', () => {}); res.on('end', resolve); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -37,23 +34,20 @@ async function getSheet() {
   return google.sheets({ version: 'v4', auth });
 }
 
-async function loadSeen(sheets) {
+async function loadRows(sheets) {
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Sheet1!A:A'
+    range: 'Sheet1!A:C'
   });
-  const rows = res.data.values || [];
-  const seen = {};
-  rows.flat().forEach(id => seen[id] = true);
-  return seen;
+  return res.data.values || [];
 }
 
-async function saveId(sheets, id) {
+async function saveRow(sheets, id, platform, date) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: 'Sheet1!A:A',
+    range: 'Sheet1!A:C',
     valueInputOption: 'RAW',
-    requestBody: { values: [[id]] }
+    requestBody: { values: [[id, platform, date]] }
   });
 }
 
@@ -73,8 +67,33 @@ async function sendWhatsApp(message) {
     req.end();
   });
 }
+
 function stars(n) {
   return '⭐'.repeat(n) + '☆'.repeat(5 - n);
+}
+
+function toIST(date) {
+  return new Date(date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+}
+
+function yesterdayIST() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  d.setDate(d.getDate() - 1);
+  return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+}
+
+async function sendSummary(sheets) {
+  const rows = await loadRows(sheets);
+  const yesterday = yesterdayIST();
+
+  const yesterdayRows = rows.filter(r => r[2] === yesterday);
+  const playCount = yesterdayRows.filter(r => r[1] === 'play').length;
+  const appleCount = yesterdayRows.filter(r => r[1] === 'apple').length;
+  const total = playCount + appleCount;
+
+  const msg = `📊 *Daily Review Summary*\n📅 ${yesterday}\n\n🤖 Play Store: ${playCount} new review${playCount !== 1 ? 's' : ''}\n🍎 App Store: ${appleCount} new review${appleCount !== 1 ? 's' : ''}\n\n*Total: ${total} new review${total !== 1 ? 's' : ''} yesterday*`;
+  await sendWhatsApp(msg);
+  console.log('Summary sent!');
 }
 
 async function checkPlayStore(sheets, seen) {
@@ -86,8 +105,8 @@ async function checkPlayStore(sheets, seen) {
   for (const r of reviews.data) {
     if (seen[r.id]) continue;
     seen[r.id] = true;
-    await saveId(sheets, r.id);
-    const msg = `*New Play Store Review*\n${stars(r.score)}\n ${r.userName}\n ${new Date(r.date).toDateString()}\n\n"${r.text}"`;
+    await saveRow(sheets, r.id, 'play', toIST(r.date));
+    const msg = ` *New Play Store Review*\n${stars(r.score)}\n ${r.userName}\n ${new Date(r.date).toDateString()}\n\n"${r.text}"`;
     await sendWhatsApp(msg);
     console.log('Sent Play Store review:', r.id);
   }
@@ -103,8 +122,8 @@ async function checkAppStore(sheets, seen) {
   for (const r of reviews) {
     if (seen[r.id]) continue;
     seen[r.id] = true;
-    await saveId(sheets, r.id);
-    const msg = `*New App Store Review*\n${stars(r.score)}\n👤 ${r.userName}\n ${new Date(r.updated).toDateString()}\n\n"${r.text}"`;
+    await saveRow(sheets, r.id, 'apple', toIST(r.updated));
+    const msg = `*New App Store Review*\n${stars(r.score)}\n ${r.userName}\n ${new Date(r.updated).toDateString()}\n\n"${r.text}"`;
     await sendWhatsApp(msg);
     console.log('Sent App Store review:', r.id);
   }
@@ -112,8 +131,18 @@ async function checkAppStore(sheets, seen) {
 
 async function main() {
   console.log('Running at', new Date().toISOString());
+  console.log('IS_SUMMARY:', IS_SUMMARY);
   const sheets = await getSheet();
-  const seen = await loadSeen(sheets);
+
+  if (IS_SUMMARY) {
+    await sendSummary(sheets);
+    return;
+  }
+
+  const rows = await loadRows(sheets);
+  const seen = {};
+  rows.forEach(r => { if (r[0]) seen[r[0]] = true; });
+
   try { await checkPlayStore(sheets, seen); } catch (e) { console.error('Play Store error:', e.message); }
   try { await checkAppStore(sheets, seen); } catch (e) { console.error('App Store error:', e.message); }
   console.log('Done ✅');
