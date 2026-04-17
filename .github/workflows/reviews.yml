@@ -2,8 +2,13 @@ name: MakeO Reviews Bot
 
 on:
   schedule:
-    - cron: '0 */3 * * *'  # runs every 3 hours
-  workflow_dispatch:  # allows manual trigger too
+    - cron: '30 3 * * *'   # 9:00 AM IST
+    - cron: '30 6 * * *'   # 12:00 PM IST
+    - cron: '30 9 * * *'   # 3:00 PM IST
+    - cron: '30 12 * * *'  # 6:00 PM IST
+    - cron: '30 15 * * *'  # 9:00 PM IST
+    - cron: '30 4 * * *'   # 10:00 AM IST (summary)
+  workflow_dispatch:
 
 jobs:
   check-reviews:
@@ -27,4 +32,5 @@ jobs:
           API_TOKEN: ${{ secrets.API_TOKEN }}
           GROUP_ID: ${{ secrets.GROUP_ID }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GITHUB_EVENT_SCHEDULE: ${{ github.event.schedule }}
         run: node index.js
