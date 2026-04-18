@@ -37,17 +37,17 @@ async function getSheet() {
 async function loadRows(sheets) {
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Sheet1!A:C'
+    range: 'Sheet1!A:A'
   });
   return res.data.values || [];
 }
 
-async function saveRow(sheets, id, platform, date) {
+async function saveId(sheets, id) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: 'Sheet1!A:C',
+    range: 'Sheet1!A:A',
     valueInputOption: 'RAW',
-    requestBody: { values: [[id, platform, date]] }
+    requestBody: { values: [[id]] }
   });
 }
 
@@ -72,26 +72,58 @@ function stars(n) {
   return '⭐'.repeat(n) + '☆'.repeat(5 - n);
 }
 
-function toIST(date) {
-  return new Date(date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+function getYesterdayIST() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  now.setDate(now.getDate() - 1);
+  now.setHours(0, 0, 0, 0);
+  return now;
 }
 
-function yesterdayIST() {
-  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-  d.setDate(d.getDate() - 1);
-  return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+function isYesterday(date) {
+  const yesterday = getYesterdayIST();
+  const d = new Date(new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  return d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate();
 }
 
-async function sendSummary(sheets) {
-  const rows = await loadRows(sheets);
-  const yesterday = yesterdayIST();
+async function sendSummary() {
+  console.log('Fetching summary...');
+  let playCount = 0, appleCount = 0;
+  let playTotal = 0, appleTotal = 0;
 
-  const yesterdayRows = rows.filter(r => r[2] === yesterday);
-  const playCount = yesterdayRows.filter(r => r[1] === 'play').length;
-  const appleCount = yesterdayRows.filter(r => r[1] === 'apple').length;
+  // Count yesterday's Play Store reviews
+  try {
+    const reviews = await gplay.reviews({
+      appId: 'com.toothsi',
+      sort: gplay.sort.NEWEST,
+      num: 50
+    });
+    for (const r of reviews.data) {
+      playTotal++;
+      if (isYesterday(r.date)) playCount++;
+    }
+  } catch (e) { console.error('Play Store summary error:', e.message); }
+
+  // Count yesterday's App Store reviews
+  try {
+    const reviews = await store.reviews({
+      id: 1573537173,
+      country: 'in',
+      sort: store.sort.RECENT,
+      page: 1
+    });
+    for (const r of reviews) {
+      appleTotal++;
+      if (isYesterday(r.updated)) appleCount++;
+    }
+  } catch (e) { console.error('App Store summary error:', e.message); }
+
+  const yesterday = getYesterdayIST();
+  const dateStr = yesterday.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
   const total = playCount + appleCount;
 
-  const msg = `📊 *Daily Review Summary*\n📅 ${yesterday}\n\n🤖 Play Store: ${playCount} new review${playCount !== 1 ? 's' : ''}\n🍎 App Store: ${appleCount} new review${appleCount !== 1 ? 's' : ''}\n\n*Total: ${total} new review${total !== 1 ? 's' : ''} yesterday*`;
+  const msg = ` *Daily Review Summary*\n ${dateStr}\n\n Play Store: ${playCount} new review${playCount !== 1 ? 's' : ''}\n App Store: ${appleCount} new review${appleCount !== 1 ? 's' : ''}\n\n*Total: ${total} new review${total !== 1 ? 's' : ''} yesterday*`;
   await sendWhatsApp(msg);
   console.log('Summary sent!');
 }
@@ -105,7 +137,7 @@ async function checkPlayStore(sheets, seen) {
   for (const r of reviews.data) {
     if (seen[r.id]) continue;
     seen[r.id] = true;
-    await saveRow(sheets, r.id, 'play', toIST(r.date));
+    await saveId(sheets, r.id);
     const msg = ` *New Play Store Review*\n${stars(r.score)}\n ${r.userName}\n ${new Date(r.date).toDateString()}\n\n"${r.text}"`;
     await sendWhatsApp(msg);
     console.log('Sent Play Store review:', r.id);
@@ -122,8 +154,8 @@ async function checkAppStore(sheets, seen) {
   for (const r of reviews) {
     if (seen[r.id]) continue;
     seen[r.id] = true;
-    await saveRow(sheets, r.id, 'apple', toIST(r.updated));
-    const msg = `*New App Store Review*\n${stars(r.score)}\n ${r.userName}\n ${new Date(r.updated).toDateString()}\n\n"${r.text}"`;
+    await saveId(sheets, r.id);
+    const msg = ` *New App Store Review*\n${stars(r.score)}\n ${r.userName}\n ${new Date(r.updated).toDateString()}\n\n"${r.text}"`;
     await sendWhatsApp(msg);
     console.log('Sent App Store review:', r.id);
   }
@@ -132,13 +164,13 @@ async function checkAppStore(sheets, seen) {
 async function main() {
   console.log('Running at', new Date().toISOString());
   console.log('IS_SUMMARY:', IS_SUMMARY);
-  const sheets = await getSheet();
 
   if (IS_SUMMARY) {
-    await sendSummary(sheets);
+    await sendSummary();
     return;
   }
 
+  const sheets = await getSheet();
   const rows = await loadRows(sheets);
   const seen = {};
   rows.forEach(r => { if (r[0]) seen[r[0]] = true; });
